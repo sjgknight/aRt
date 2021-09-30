@@ -1,0 +1,228 @@
+---
+title: "Running data"
+output: html_notebook
+  ---
+
+There are a few commercial services that do this:
+* https://strartwork.com/ 
+* https://mapridesshop.com
+* https://cartorion.com
+* https://loopieroute.com
+* https://papertrails.io
+* There was another that made 3D profile pictures too
+* There's a nice description of doing this in tableau https://www.tableau.com/about/blog/2019/3/how-make-art-out-your-strava-activity-data-tableau-104639 
+
+* Also nice using Affinity Designer (Inkscape noted as free alternative, it's used for background) and raw graphs, uses a beeswarm plot https://towardsdatascience.com/create-beautiful-art-from-your-personal-data-9dc0abfeeaf  ...there is an R package for beeswarms! Called `beeswarm` appropriately enough (see chunk below)
+
+*And a description for single statmaps https://www.vishplease.com/data-feed/statmaps 
+
+Obviously this largely applies to non-running location data too.
+FRICKbits was an app (still available for iphone) https://github.com/thirteen23/FRICKbits/ 
+
+
+There is also an R package (there are garmin packages too, I suspect much of the data structure is identical so this may work with other apps)
+```{r}
+# install.packages(c("devtools", "mapproj", "tidyverse", "gtools"))
+# devtools::install_github("marcusvolz/strava")
+# devtools::install_github("AtherEnergy/ggTimeSeries")
+library(strava)
+library(ggpomological)
+library(ggthemr)
+library(ggplot)
+
+#remotes::install_github("jarrodolson/StravaR") #not updated in 5 years
+#devtools::install_github('fawda123/rStrava') #current
+library(rStrava)
+
+library(beeswarm)
+```
+
+Set some theme things
+```{r}
+ggthemr('dust')
+ggthemr_reset()
+library(wesanderson)
+```
+
+Import data
+```{r}
+data <- process_data("Strava\\activities")
+
+
+############FIT to gpx conversion #####################
+#######################################################
+#This is importing 250 of 704 cases. Why?
+#In addition to Strava changing data formats, if you use garmin import (?) they're in fit.  Needs converting fitdc.
+library(cycleRtools)
+#library(fitdc)
+library(R.utils)
+
+gunzip("Strava\\activities\\2395986667.fit.gz", remove=FALSE)
+
+x <- cycleRtools::read_fit("Strava\\activities\\2395986667.fit", format = FALSE)
+
+data1 <- 
+
+#read_fit per file gives me the below. I need it to match the columns from process_data. ID is set per file, based on the last ID in the process_data
+
+> cat(colnames(x))
+ï..record.timestamp.s. record.distance.m. record.speed.m.s. record.unknown record.heart_rate.bpm. record.cadence.rpm. record.fractional_cadence.rpm. record.enhanced_speed.m.s. record.position_lat.semicircles. record.position_long.semicircles. record.altitude.m. record.enhanced_altitude.m. X lap
+
+ [1] "id"                "lat"               "lon"              
+ [4] "ele"               "time"              "type"             
+ [7] "dist_to_prev"      "cumdist"           "time_diff_to_prev"
+[10] "cumtime" 
+  
+#######################################################
+#######################################################
+#######################################################
+
+#Alternatively, use rStrava package to connect to the strava API. Go to https://www.strava.com/settings/api and register key. And see if accessing data that way is consistent (and can be matched with the data from process_data function, which is used subsequently)
+
+```
+
+Add location string (city,country, whatever) 
+```{r}
+library(tidygeocoder)
+library(tidyverse)
+#A preferable way of doing this would just be to the city level, which can be done https://dmbeskow.github.io/Reverse-Geocode/ using the 2nd approach, EXCEPT it requires downloading 3 million rows of cities... There must be a wikidata approach (query directly) e.g. based on https://stackoverflow.com/questions/44718137/get-wikidata-identifier-for-city-by-gps-location 
+#Using tidygeocoder some info needs stripping out (because it gets the full address, as far as I can see as a string so it's not obvious how to narrow down...there are also oddities like in Aus 'redfern' is the city, even though any ordinary use would refer to sydney as city)
+#As a result, it might make most sense to view the list, and then create aggregate groups on an adhoc basis. That would also allow variation, e.g. maybe you want all your US runs together (even though they're over NYC, NJ, CA, etc.), but granularity in London (Battersea, Bermondsey, Bexley, etc)
+
+places <- data %>%
+  group_by(id) %>%
+  filter(row_number()==1) %>%
+           reverse_geocode(
+             .,
+             lat = lat,
+             long = lon,
+             method = 'osm',
+             return_input = T, 
+             limit = 1)
+
+places <- places %>%
+  mutate(location = case_when(
+    stri_detect_fixed(address, "Sydney") ~ "Sydney",
+    stri_detect_fixed(address, "London") ~ "London",
+    stri_detect_fixed(address, "Canada") ~ "Canada",
+    stri_detect_fixed(address, "México") ~ "Mexico",
+    stri_detect_fixed(address, "Leamington Spa") ~ "Leamington Spa",
+    TRUE ~ "DEFAULT"))
+#use TRUE ~ address to preserve the whole address. You could probably use string split to select the 2nd address part with reasonable success
+
+
+data <- left_join(data, places %>% select(id,address,location), by = "id") #should join on id
+
+data <- data %>%
+  mutate(date = as.Date(time, "%d-%m-%Y")) %>%
+  arrange(date,id,cumtime)
+
+```
+
+A modified function that: (1) lets you use colour for background and line colour, which (2) would let yo use the 'location' variable to vary a colour
+```{r}
+#In the below, line_colour and back_colour set the background of the grid, and the line colours. You can use a variable for these I think, you'd need to change the summary assignment to a conditional, if length(line_colour) > 1, then include that variable in the summary grouping.
+#Grid lines should be hidden by default although that doesn't seem to have worked.
+
+#in the below, you can use a variable in 'back_colour' and 'line_colour' which in theory will pass to a pallette. Giving it colours doesn't work, it just treats it as a variable and uses whatever pallet is already set, so to change those add code...
+
+plot_facets2 <- function (data, labels = FALSE, scales = "free", line_colour = "black", back_colour = "firebrick", show_grid = FALSE) 
+{
+    summary <- data %>% dplyr::group_by(id) %>% dplyr::summarise(lon = mean(range(lon)), 
+        lat = mean(range(lat)), distance = sprintf("%.1f", 
+            max(cumdist)))
+    
+    if (scales == "fixed") {
+        data <- data %>% dplyr::group_by(id) %>% dplyr::mutate(lon = lon - 
+            mean(lon), lat = lat - mean(lat))
+    }
+    else {
+        scales = "free"
+    }
+    p <- ggplot2::ggplot() + ggplot2::geom_path(ggplot2::aes(lon, lat, group = id, colour = line_colour), data, size = 0.35, lineend = "round") + 
+        ggplot2::facet_wrap(~id, scales = scales) +
+      ggplot2::theme_void() + 
+      ggplot2::theme(panel.spacing = ggplot2::unit(0, "lines"),
+                     strip.text = ggplot2::element_blank(),
+                     plot.margin = ggplot2::unit(rep(1, 4), "cm"),
+                     plot.background = element_rect(fill = back_colour),
+                     panel.grid = ggplot2::element_blank(),
+                     legend.position = "none")
+    
+    if (scales == "fixed") {
+        p <- p + ggplot2::coord_fixed()
+    }
+   # if (show_grid == FALSE) {
+    #  p <- p + ggplot2::theme(panel.border = ggplot2::element_blank()) #doesnt work panel.border = element_rect(fill = back_colour)) #not sure why 
+    #}
+    if (labels) {
+        p <- p + ggplot2::geom_text(ggplot2::aes(lon, lat, label = distance), 
+            data = summary, alpha = 0.25, size = 3)
+    }
+    p
+}
+
+
+t <- plot_facets2(data, line_colour = data$location)
+
+
+#You can play with the line colours like this
+t + scale_color_manual(values=wes_palette(n=3, name="GrandBudapest"))
+
+#Or e.g. like this
+t + + scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9"))
+
+#Work out how to use that dust one above
+
+
+```
+
+
+Plot activities as small multiples using the original package function (which the above is based on)
+```{r}
+p1 <- plot_facets(data) #defaults to scales = free, change to "fixed" to show absolute distance for each one. defaults to no labels, change labels = TRUE to show distance labels.
+
+#to add a background (strava orange is fc4c02 in this case, I get an error, but firebrick is v nice)
+p1 <- p1 + theme()
+
+#to change the course colour
+p1 + geom_path(colour = "red") #size = 10 if you want to change size
+
+ggsave("1.png", p1, width = 20, height = 20, units = "cm")
+
+```
+
+Plot activity map
+```{r}
+p2 <- plot_map(data, lon_min = 144.9, lon_max = 145.73, lat_min = -38.1, lat_max = -37.475)
+ggsave("plots/map001.png", p2, width = 20, height = 15, units = "cm", dpi = 600)
+```
+
+Plot calendar
+```{r}
+p4 <- plot_calendar(data, unit = "distance")
+ggsave("plots/calendar001.png", p4, width = 20, height = 20, units = "cm")
+```
+
+Plot ridges
+```{r}
+p5 <- plot_ridges(data)
+ggsave("plots/ridges001.png", p5, width = 20, height = 20, units = "cm")
+```
+
+Plot packed circles
+```{r}
+p6 <- plot_packed_circles(data)
+ggsave("plots/packed_circles001.png", p6, width = 20, height = 20, units = "cm")
+```
+
+Plot beeswarm (nice examples https://r-charts.com/distribution/beeswarm/)
+```{r}
+
+```
+
+
+```{r}
+#https://rstudio.github.io/leaflet/basemaps.html
+```
+

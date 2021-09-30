@@ -1,0 +1,38 @@
+---
+title: "Paletts"
+output: html_notebook
+---
+
+Just some nice pallets
+
+You can also conect to D3 in R eg using r2d3 (ha) which is maybe cool https://rstudio.github.io/r2d3/articles/learning_d3.html 
+
+
+This one is Aussie bird plumage!! github.com/shandiya/feathers
+https://ropensci.org/blog/2017/11/21/ochre/ - ausie colours
+
+
+```{r}
+
+
+
+#devtools::install_github("gadenbuie/ggpomological")
+#devtools::install_github('Mikata-Project/ggthemr')
+library(ggpomological)
+library(xkcd)
+library(ggthemr)
+#hrbrthemes is nice for simple clean themes
+
+#if you want to use xkcd style install the xkcd fonts too (or does the package do this already?)
+# library(extrafont)
+# font_import(...
+
+#To use ggpomological - which makes pretty looking watercolor styles - create a ggplot as usual, and then + theme_pomological_fancy() to apply the theme
+# #There's also a nice paint option to change the background to a textured paper look 
+# paint_pomological(pomological_iris, res = 110) %>% 
+#   magick::image_write(set_filename("plot-demo-painted.png"))
+
+#ggthemr dust and light themes are also quite lovely, as above, + dust_theme applies
+
+```
+

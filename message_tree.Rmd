@@ -1,0 +1,25 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+I'm looking to make a plot such that:
+* There is an x y axis with one quadrant
+* There is a https://stackoverflow.com/questions/43773087/how-to-create-stem-plot-in-r 
+* Height represents ...duration?
+* There is a 'flower' or bush on top of the trunk (representing length?)
+* Leaves fall left or right (possibly sent vs received?)
+
+For aesthetics
+* the corymb example is really rather beautiful https://keyserver.lucidcentral.org/weeds/data/media/Html/glossary.htm 
+* https://eric.netlify.app/2017/11/24/using-a-multivariate-normal-to-draw-a-flower-in-ggplot2/
+* EmoGG may be used to insert emoji into charts (as one approach)  install_github("dill/emoGG")
+* https://github.com/Ijeamakaanyene/houseplants creates houseplants in R...woop
+* https://roweyerboat.github.io/drawing_flowers_with_r_and_ggplot2 draws some flower-head-like ggplots 
+* https://martindevaux.com/2021/01/randomly-position-points-in-circle-r/ 
+
+
+```{r}
+
+```
+
